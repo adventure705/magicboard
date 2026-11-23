@@ -2,6 +2,7 @@
 (function(root){'use strict';
   const SCOPE='https://www.googleapis.com/auth/spreadsheets';
   const BASE='https://sheets.googleapis.com/v4/spreadsheets/';
+  const CACHE_VERSION='1';
   let gisLoad;
   function loadGis(){
     if(root.google?.accounts?.oauth2)return Promise.resolve();
@@ -20,16 +21,29 @@
   function create({config={},onData=()=>{},onClear=()=>{},onState=()=>{},shouldAutoRefresh=()=>true}={}){
     const clientId=String(config.googleClientId||'').trim(),sid=String(config.spreadsheetId||'').trim();
     const interval=Math.min(3600,Math.max(30,Number(config.refreshSeconds)||60))*1000;
-    let token='',expiresAt=0,tokenClient,ready=false,busy=false,verified=false,writeGranted=false,epoch=0;
+    // Deliberately per-tab: a private sheet token must never survive a browser restart.
+    const cacheKey='magic-board.google-token.'+CACHE_VERSION+'.'+encodeURIComponent(clientId)+'.'+encodeURIComponent(sid)+'.'+encodeURIComponent(SCOPE);
+    let token='',expiresAt=0,grantedScope='',tokenClient,ready=false,busy=false,verified=false,writeGranted=false,epoch=0;
     let expiryTimer,pollTimer,requestController,probeState=null,refreshCount=0;
     const fullRanges=["'샵목록'","'일별관측'!A1:M","'구간별관측'!A1:Q","'설정안내'!A1:B"];
     const sheetUrl='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sid)+'/edit';
     function valid(){return !!token&&Date.now()<expiresAt}
+    function cacheDrop(){try{root.sessionStorage?.removeItem(cacheKey)}catch{}}
+    function cacheRead(){
+      try{
+        const value=root.sessionStorage?.getItem(cacheKey);if(!value)return null;
+        const saved=JSON.parse(value);
+        if(!saved||typeof saved!=='object'||typeof saved.accessToken!=='string'||!saved.accessToken||typeof saved.expiresAt!=='number'||!Number.isFinite(saved.expiresAt)||typeof saved.scope!=='string'||saved.expiresAt<=Date.now()||saved.expiresAt>Date.now()+86400000){cacheDrop();return null}
+        return saved;
+      }catch{cacheDrop();return null}
+    }
+    function cacheSave(){try{root.sessionStorage?.setItem(cacheKey,JSON.stringify({accessToken:token,expiresAt,scope:grantedScope}))}catch{}}
+    function armExpiry(){clearTimeout(expiryTimer);expiryTimer=setTimeout(expired,Math.max(0,expiresAt-Date.now()))}
     function autoAllowed(){try{return !!shouldAutoRefresh()}catch{return false}}
-    function state(phase,text,error=false){onState({phase,text,error,authenticated:verified,canLogin:ready&&!busy,canRefresh:valid()&&!busy,canWrite:verified&&valid()&&writeGranted&&!busy})}
-    function clear(){
-      epoch++;requestController?.abort();requestController=null;token='';expiresAt=0;verified=false;writeGranted=false;busy=false;probeState=null;refreshCount=0;
-      clearTimeout(expiryTimer);onClear();
+    function state(phase,text,error=false){onState({phase,text,error,authenticated:verified,canLogin:ready&&!busy,canRefresh:valid()&&!busy,hasWritePermission:verified&&valid()&&writeGranted,canWrite:verified&&valid()&&writeGranted&&!busy})}
+    function clear({dropCache=true}={}){
+      epoch++;requestController?.abort();requestController=null;token='';expiresAt=0;grantedScope='';verified=false;writeGranted=false;busy=false;probeState=null;refreshCount=0;
+      clearTimeout(expiryTimer);if(dropCache)cacheDrop();onClear();
     }
     function expired(){clear();state('expired','로그인이 만료됐습니다. 다시 로그인해 주세요.',true)}
     function probeRanges(data){
@@ -65,7 +79,10 @@
       }catch(error){
         if(activeEpoch!==epoch)return;if(error.name==='AbortError')error=new Error('시트 응답이 지연되고 있습니다. 다시 시도해 주세요.');
         if(error.status===401){expired();return}
-        if(error.status===403||!verified){clear();state('error',error.message||'시트에 연결하지 못했습니다.',true);return}
+        if(error.status===403){clear();state('error',error.message||'시트에 연결하지 못했습니다.',true);return}
+        // A restored token is not authenticated until its read succeeds, but a transient
+        // failure must not discard a valid, per-tab token.
+        if(!verified){busy=false;state('error',error.message||'시트에 연결하지 못했습니다.',true);return}
         busy=false;state('error','연결 오류 · 마지막으로 읽은 데이터입니다. 새로고침해 주세요.',true);
       }finally{clearTimeout(timeout);if(activeEpoch===epoch){requestController=null;if(busy){busy=false;state(verified?'connected':'sign-in-required',verified?'시트 연결됨':'다시 로그인해 주세요.')}}}
     }
@@ -101,19 +118,22 @@
       tokenClient.callback=response=>{
         if(loginEpoch!==epoch)return;
         if(response.error||!response.access_token){busy=false;state('error','Google 로그인을 완료하지 못했습니다. 다시 시도해 주세요.',true);return}
-        token=response.access_token;writeGranted=String(response.scope||'').split(/\s+/).includes(SCOPE);
-        const seconds=Math.min(86400,Math.max(60,Number(response.expires_in)||3600));expiresAt=Date.now()+(seconds-20)*1000;expiryTimer=setTimeout(expired,Math.max(0,expiresAt-Date.now()));busy=false;refresh({force:true});
+        token=response.access_token;grantedScope=String(response.scope||'');writeGranted=grantedScope.split(/\s+/).includes(SCOPE);
+        const rawSeconds=Number(response.expires_in),seconds=Number.isFinite(rawSeconds)&&rawSeconds>0?Math.min(86400,rawSeconds):0;expiresAt=Date.now()+seconds*1000;cacheSave();armExpiry();busy=false;refresh({force:true});
       };
       try{tokenClient.requestAccessToken({prompt:'select_account'})}catch{busy=false;state('error','로그인 창을 열지 못했습니다. 팝업을 허용하고 다시 시도하세요.',true)}
     }
     function logout(){clear();state('sign-in-required','로그아웃했습니다. 다른 계정으로 다시 로그인할 수 있습니다.')}
     async function init(){
-      clear();state('loading','연결 준비 중');
+      clear({dropCache:false});state('loading','연결 준비 중');
       if(!/^[a-zA-Z0-9_-]{20,}$/.test(sid)||!clientId.endsWith('.apps.googleusercontent.com')){state('setup-required','Google 로그인 설정이 필요합니다. config.js와 배포 안내를 확인하세요.',true);return}
       if(location.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(location.hostname)){state('setup-required','HTTPS 웹 주소나 localhost에서 열어주세요. 파일을 직접 열면 로그인할 수 없습니다.',true);return}
       try{
         await loadGis();tokenClient=root.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:SCOPE,include_granted_scopes:false,callback:()=>{},error_callback:()=>{busy=false;state('error','로그인 창이 닫혔거나 차단되었습니다. 다시 로그인해 주세요.',true)}});
-        ready=true;state('sign-in-required','시트 접근 권한이 있는 Google 계정으로 로그인하세요.');clearInterval(pollTimer);pollTimer=setInterval(()=>{if(!document.hidden&&!busy&&valid()&&autoAllowed())refresh({auto:true})},interval);
+        ready=true;const saved=cacheRead();
+        if(saved){token=saved.accessToken;expiresAt=saved.expiresAt;grantedScope=saved.scope;writeGranted=grantedScope.split(/\s+/).includes(SCOPE);armExpiry();state('loading','저장된 로그인으로 시트 확인 중');refresh({force:true})}
+        else state('sign-in-required','시트 접근 권한이 있는 Google 계정으로 로그인하세요.');
+        clearInterval(pollTimer);pollTimer=setInterval(()=>{if(!document.hidden&&!busy&&valid()&&autoAllowed())refresh({auto:true})},interval);
         document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!busy){if(valid()&&autoAllowed())refresh({auto:true,force:true});else if(token&&!valid())expired()}});
       }catch(error){ready=false;state('error',error.message||'Google 로그인 도구를 불러오지 못했습니다.',true)}
     }

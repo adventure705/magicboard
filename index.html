@@ -179,7 +179,8 @@ td small, th small { display: block; color: var(--muted); }
 .shop-details > a { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pin-shop { padding: 0; border: 0; background: transparent; width: 24px; min-height: 24px; flex: none; font-size: 19px; line-height: 1; color: #655b70; }
 .pin-shop[aria-pressed="true"] { color: #8f5200; background: #fff0c9; }
-.memocell textarea { width: 120px; height: 36px; min-height: 36px; resize: none; white-space: pre; overflow: auto; display: inline-block; vertical-align: middle; border-color: transparent; background: transparent; line-height: 1.4; }
+.memocell textarea { width: 120px; height: 36px; min-height: 36px; resize: none; white-space: pre; overflow: hidden; scrollbar-width: none; display: inline-block; vertical-align: middle; border-color: transparent; background: transparent; line-height: 1.4; }
+.memocell textarea::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .memocell textarea:focus { background: white; border-color: var(--line); }
 .memo-preview { position: fixed; z-index: 12; width: min(320px, calc(100vw - 20px)); max-height: min(185px, 35vh); padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: 0 8px 25px #17171930; overflow: auto; overscroll-behavior: contain; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 @media (max-width: 740px) {
@@ -350,7 +351,7 @@ table td small { font-size: 13px; }
 #sheetStatus:not([data-phase="connected"])::before{background:#c4c2c5}
 #sheetStatus.sync-error::before{background:#ffd0c7}
 .read-value{display:block;max-width:160px;min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;color:var(--ink)}
-[data-memo]{cursor:help}.watch-actions{row-gap:6px}.watch-actions a{padding:8px 4px}
+[data-memo],.categorycell input{cursor:text}.watch-actions{row-gap:6px}.watch-actions a{padding:8px 4px}
 
 /* Sheet editing controls */
 .shop-icon { display:inline-grid; place-items:center; width:28px; min-height:32px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--muted); }
@@ -365,7 +366,7 @@ th .shop-select { vertical-align:middle; margin-right:6px; }
 </style>
 </head><body><div class="studio"><div class="layout"><aside class="sidebar"><div><div class="brand">Magic Board</div><div class="personal">My workspace<small>개인 Etsy 관측 공간</small></div></div><div><div class="navlabel">워크스페이스</div><nav role="tablist" aria-label="대시보드 메뉴"><button role="tab" data-pane="sales" aria-selected="true"><span>판매 대시보드</span><span class="navcount" id="navCount">–</span></button><button role="tab" data-pane="favorites" aria-selected="false">샵 즐겨찾기</button><button role="tab" data-pane="settings" aria-selected="false">연결·수집</button></nav></div><div class="sidebar-connection"><span id="sheetStatus" class="pill" role="status" aria-live="polite">연결 준비 중</span></div></aside><main class="workspace"><header class="topbar"><div class="breadcrumb">My workspace / Etsy analytics</div><div class="row"><h1 id="pageTitle">판매 대시보드</h1><div class="actions watch-actions"><button type="button" id="watchSignIn" class="primary" disabled>Google로 로그인</button><button type="button" id="watchLogout" hidden>로그아웃</button><button type="button" id="watchRefresh" disabled>새로고침</button><a id="watchSheet" class="watch-sheet" target="_blank" rel="noopener noreferrer" hidden>스프레드시트</a></div></div></header><div class="clocks" id="clocks"></div>
 <section class="panel cardcontent" id="watchSignInPanel" aria-labelledby="watchGateTitle"><h2 id="watchGateTitle">비공개 대시보드</h2><p id="watchGateMessage">시트 열람 권한이 있는 Google 계정으로 로그인하세요.</p><noscript>이 페이지를 보려면 JavaScript를 켜세요.</noscript></section>
-<div id="watchProtected" hidden><div id="timeAnalytics">
+<div id="watchProtected" hidden><div id="draftStatus" role="status" aria-live="polite" hidden><span id="draftMessage"></span> <button type="button" id="retryDraft" hidden>다시 시도</button> <button type="button" id="discardDraft" hidden>이 초안 버리고 다시 읽기</button></div><div id="timeAnalytics">
   <div class="table-filters period-bar"><label class="date-control">기준일 <input id="date" type="date" aria-label="집계 기준일"><span id="dateWeekday" class="date-weekday"></span></label><label class="date-control">집계 방식 <select id="period"><option value="daily">일별 합계</option><option value="am">00~12시</option><option value="pm">12~24시</option></select></label><span class="muted period-note">KST · 12시간 구간 · 실제 관측 시각 기준</span></div>
   <section class="panel cardcontent ranking-panel" aria-labelledby="rank"><h2 id="rank">판매 순위 · TOP 10</h2><div class="empty" id="timeRank"></div></section>
 </div>
@@ -381,17 +382,18 @@ th .shop-select { vertical-align:middle; margin-right:6px; }
   <div id="trendContent"></div>
   <a id="trendLink" class="shop-link" target="_blank" rel="noopener" aria-label="Etsy 샵 열기" title="샵 메인 · Most recent"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>
 </dialog><dialog id="deleteDialog" aria-labelledby="deleteTitle" aria-describedby="deleteDescription"><h2 id="deleteTitle">샵 삭제</h2><p id="deleteDescription">삭제한 샵은 관측 이력은 보존한 채 추적만 중단됩니다.</p><p id="deleteNames" class="muted"></p><div class="row"><span></span><div class="actions"><button id="deleteCancel" type="button">취소</button><button id="deleteConfirm" class="primary" type="button">삭제</button></div></div></dialog>
-<script src="./config.js?v=20261123-rank3"></script>
-<script src="./sheets-data.js?v=20261123-rank3"></script>
-<script src="./sheets-write.js?v=20261123-rank3"></script>
-<script src="./remote-data.js?v=20261123-rank3"></script>
+<script src="./config.js?v=20261123-save4"></script>
+<script src="./sheets-data.js?v=20261123-save4"></script>
+<script src="./sheets-write.js?v=20261123-save4"></script>
+<script src="./remote-data.js?v=20261123-save4"></script>
+<script src="./autosave.js?v=20261123-save4"></script>
 <script>(()=>{
 'use strict';
 const emptyData=()=>({anchorDay:'',shops:[],customColumns:[],history:{},intervalHistory:{},dailySources:{}});
 let dashboardData=emptyData(),shops=[],selectedDate='';
 const periodLabels={daily:"일별 합계",am:"00~12시",pm:"12~24시"};
 let period="daily",activePane="sales";
-let remote=null, canWrite=false, authenticated=false, remotePhase="", editing=null, editBase=null, pendingDeleteIds=[], watchUndoIds=[];
+let remote=null, sessionEpoch=0, hasWritePermission=false, canWrite=false, authenticated=false, remotePhase="", editing=null, editBase=null, pendingDeleteIds=[], watchUndoIds=[];
 const checked=new Set();
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),num=n=>Number.isFinite(n)?n.toLocaleString('en-US'):'–',days=[],short=d=>d.slice(5).replace('-','/');
 function clocks() {
@@ -558,10 +560,44 @@ function gridValue(s,key,fav){if(key==='name')return s.name;if(key==='memo')retu
 function gridRows(rows,fav){const order=gridSort[fav?'favorites':'sales'];return [...rows].sort((a,b)=>{const pinnedFirst=Number(pinnedShops.has(b.id))-Number(pinnedShops.has(a.id));if(pinnedFirst||!order)return pinnedFirst;const x=gridValue(a,order.key,fav),y=gridValue(b,order.key,fav),empty=v=>v==null||v===''||v==='–'||(typeof v==='number'&&!Number.isFinite(v));if(empty(x)||empty(y))return empty(x)&&empty(y)?a.name.localeCompare(b.name,'ko'):empty(x)?1:-1;const n=typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'ko',{numeric:true,sensitivity:'base'});return (order.dir==='desc'?-n:n)||a.name.localeCompare(b.name,'ko')})}
 const CATEGORY_KEY = 'custom:카테고리';
 const categoryColumn={key:CATEGORY_KEY,name:'카테고리',type:'text'};
+const AUTO_FIELDS = '[data-memo],[data-custom="custom:카테고리"]';
+const editorFields = '[data-memo],[data-custom]';
+const fieldOf = el => el.hasAttribute('data-memo') ? [el.dataset.memo,'memo'] : [el.dataset.customShop,el.dataset.custom];
+const fieldValue = (shop,field) => String((field==='memo'?shop.memo:shop.custom?.[field])??'');
+const baselines = new WeakMap();
+let renderDeferred = false;
+const autosave = window.MagicBoardAutosave.create({
+  canStart:writeAllowed,
+  async save({id,field,value,expected}) {
+    // Remote verifies the PATCH against a fresh sheet read and publishes onData before resolving.
+    const result=await remote.mutate({action:'patch',id,values:{[field]:value},expected:{[field]:expected}});
+    const shop=result?.data?.shops?.find(s=>s.id===id);
+    if(!shop)throw new Error('저장한 값을 확인할 수 없습니다.');
+    return fieldValue(shop,field);
+  },
+  confirmed(id,field,value) {
+    for(const el of $('table').querySelectorAll(AUTO_FIELDS)) {
+      const [i,f]=fieldOf(el);if(i===id&&f===field)baselines.set(el,value);
+    }
+  },
+  changed(){updateDraftStatus();updateWriteControls();resumeRender();}
+});
+function updateDraftStatus(){
+  const error=autosave.errors()[0];
+  const text=error?(shops.find(s=>s.id===error.id)?.name||error.id)+' · '+(error.field==='memo'?'메모':'카테고리')+' 저장 안 됨: '+error.error:autosave.hasUnsaved()?'저장 대기 중인 변경 사항이 있습니다.':'';
+  if($('draftMessage').textContent!==text)$('draftMessage').textContent=text;
+  $('draftStatus').hidden=!text;$('retryDraft').hidden=$('discardDraft').hidden=!error;
+}
+$('retryDraft').onclick=()=>{const d=autosave.errors()[0];if(d)autosave.retry(d.id,d.field)};
+$('discardDraft').onclick=()=>{const d=autosave.errors()[0];if(d&&writeAllowed()){autosave.discard(d.id,d.field);render();remote.refresh()}};
+function resumeRender(){
+  if(document.activeElement===preview || document.activeElement?.closest('#table button,#table a,#table input[type="checkbox"]'))return;
+  if(renderDeferred && !autosave.hasUnsaved() && $('form').hidden && !document.activeElement?.matches(editorFields)) render();
+}
 function customCell(shop,column,className='customcell',editable=false){
   const value=esc(shop.custom?.[column.key]??'');
   if(editable)return '<td class="'+className+'"><input data-custom-shop="'+esc(shop.id)+'" data-custom="'+esc(column.key)+'" aria-label="'+esc(shop.name+' '+column.name)+'" value="'+value+'"></td>';
-  return '<td class="'+className+'"><span class="read-value" title="'+value+'">'+value+'</span></td>';
+  return '<td class="'+className+'"><span class="read-value" '+(column.key===CATEGORY_KEY?'data-preview tabindex="0"':'title="'+value+'"')+'>'+value+'</span></td>';
 }
 function gridHeaders(fav) {
   const view=fav?'favorites':'sales';
@@ -593,12 +629,12 @@ const freezeObserver = new ResizeObserver(entries => {
 tableViewports.forEach(viewport => freezeObserver.observe(viewport));
 document.fonts.ready.then(() => tableViewports.forEach(updateFrozenColumns));
 
-function selection(){const all=$('all'),list=filtered();if(all){all.checked=!!list.length&&list.every(s=>checked.has(s.id));all.indeterminate=list.some(s=>checked.has(s.id))&&!all.checked}const bulk=$('bulk');bulk.disabled=!canWrite||remotePhase==='saving'||!checked.size;bulk.textContent=checked.size?'선택 '+checked.size+'샵 삭제':'선택 삭제'}
-function renderLocal(){days.splice(0,days.length,...endingDays(selectedDate,7));const calendar=$('date').value?calendarDay($('date').value):null;$('dateWeekday').textContent=calendar?calendar.name+'요일'+(calendar.holiday?' · 미국 '+calendar.holiday:calendar.style==='weekend'?' · 주말':''):'';syncFilters();const list=gridRows(filtered(),false);$('noShops').hidden=list.length>0;$('navCount').textContent=shops.length;$('shown').textContent=list.length+' / '+shops.length;function row(s,fav){const pinned=pinnedShops.has(s.id),star='<button type="button" class="pin-shop" data-pin="'+esc(s.id)+'" aria-pressed="'+pinned+'" aria-label="'+esc(s.name)+' 상단 고정">'+(pinned?'★':'☆')+'</button>';const name='<button class="shop-name" type="button" data-trend="'+esc(s.id)+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button>';const selectShop=fav?'':'<input class="shop-select" type="checkbox" data-check="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 선택" '+(checked.has(s.id)?'checked':'')+'>';const editIcon='<path d="m14 5 5 5M4 20l4-1 12-12-4-4L4 15z"/>',deleteIcon='<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',iconButton=(action,label,icon)=>'<button class="shop-icon '+action+'" type="button" data-'+action+'="'+esc(s.id)+'" aria-label="'+esc(s.name+' '+label)+'" title="'+label+'"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></button>';const shopLink=!cleanShopUrl(s.url)?'':'<a class="shop-link" href="'+esc(latest(s.url))+'" target="_blank" rel="noopener" aria-label="'+esc(s.name)+' Etsy 샵 열기" title="Etsy 샵 열기"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>';const actions='<div class="shop-tools">'+selectShop+star+(fav?'':iconButton('edit','편집',editIcon)+iconButton('delete','삭제',deleteIcon))+shopLink+'</div>';const total=fav?s.favorites:s.total,totalCell=!fav&&s.visibility==='공개'&&total!=null&&cleanShopUrl(s.url)?'<a href="'+esc(cleanShopUrl(s.url)+'/sold')+'" target="_blank" rel="noopener" title="판매 상품">'+num(total)+'</a>':num(total);return '<tr data-shop-id="'+esc(s.id)+'"><td><div class="shop-entry">'+name+actions+'</div></td>'+customCell(s,categoryColumn,'customcell categorycell',!fav)+'<td class="memocell">'+(fav?'<span class="read-value">'+esc(s.memo||'')+'</span>':'<textarea rows="1" data-memo="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 메모">'+esc(s.memo||'')+'</textarea>')+'</td><td>'+esc(countryLabel(s.country))+'</td><td><span class="public-label">'+esc(s.visibility)+'</span></td><td>'+num(s.items)+'</td><td>'+totalCell+'</td>'+gridColumns.filter(column=>column.key!==CATEGORY_KEY).map(column=>customCell(s,column,'customcell',!fav)).join('')+days.map(d=>'<td class="'+[calendarDay(d).style,d===selectedDate?'selected':''].join(' ')+'" title="'+esc(observationHint(dashboardData,s.id,d,period))+'">'+numericCell(s.id,d,fav)+'</td>').join('')+'</tr>'}
+function selection(){const all=$('all'),list=filtered();if(all){all.checked=!!list.length&&list.every(s=>checked.has(s.id));all.indeterminate=list.some(s=>checked.has(s.id))&&!all.checked}const bulk=$('bulk');bulk.disabled=!writeAllowed()||autosave.hasUnsaved()||!checked.size;bulk.textContent=checked.size?'선택 '+checked.size+'샵 삭제':'선택 삭제'}
+function renderLocal(){days.splice(0,days.length,...endingDays(selectedDate,7));const calendar=$('date').value?calendarDay($('date').value):null;$('dateWeekday').textContent=calendar?calendar.name+'요일'+(calendar.holiday?' · 미국 '+calendar.holiday:calendar.style==='weekend'?' · 주말':''):'';syncFilters();const list=gridRows(filtered(),false);$('noShops').hidden=list.length>0;$('navCount').textContent=shops.length;$('shown').textContent=list.length+' / '+shops.length;function row(s,fav){const pinned=pinnedShops.has(s.id),star='<button type="button" class="pin-shop" data-pin="'+esc(s.id)+'" aria-pressed="'+pinned+'" aria-label="'+esc(s.name)+' 상단 고정">'+(pinned?'★':'☆')+'</button>';const name='<button class="shop-name" type="button" data-trend="'+esc(s.id)+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button>';const selectShop=fav?'':'<input class="shop-select" type="checkbox" data-check="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 선택" '+(checked.has(s.id)?'checked':'')+'>';const editIcon='<path d="m14 5 5 5M4 20l4-1 12-12-4-4L4 15z"/>',deleteIcon='<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',iconButton=(action,label,icon)=>'<button class="shop-icon '+action+'" type="button" data-'+action+'="'+esc(s.id)+'" aria-label="'+esc(s.name+' '+label)+'" title="'+label+'"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></button>';const shopLink=!cleanShopUrl(s.url)?'':'<a class="shop-link" href="'+esc(latest(s.url))+'" target="_blank" rel="noopener" aria-label="'+esc(s.name)+' Etsy 샵 열기" title="Etsy 샵 열기"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>';const actions='<div class="shop-tools">'+selectShop+star+(fav?'':iconButton('edit','편집',editIcon)+iconButton('delete','삭제',deleteIcon))+shopLink+'</div>';const total=fav?s.favorites:s.total,totalCell=!fav&&s.visibility==='공개'&&total!=null&&cleanShopUrl(s.url)?'<a href="'+esc(cleanShopUrl(s.url)+'/sold')+'" target="_blank" rel="noopener" title="판매 상품">'+num(total)+'</a>':num(total);return '<tr data-shop-id="'+esc(s.id)+'"><td><div class="shop-entry">'+name+actions+'</div></td>'+customCell(s,categoryColumn,'customcell categorycell',!fav)+'<td class="memocell">'+(fav?'<span class="read-value" data-preview tabindex="0">'+esc(s.memo||'')+'</span>':'<textarea rows="1" data-memo="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 메모">'+esc(s.memo||'')+'</textarea>')+'</td><td>'+esc(countryLabel(s.country))+'</td><td><span class="public-label">'+esc(s.visibility)+'</span></td><td>'+num(s.items)+'</td><td>'+totalCell+'</td>'+gridColumns.filter(column=>column.key!==CATEGORY_KEY).map(column=>customCell(s,column,'customcell',!fav)).join('')+days.map(d=>'<td class="'+[calendarDay(d).style,d===selectedDate?'selected':''].join(' ')+'" title="'+esc(observationHint(dashboardData,s.id,d,period))+'">'+numericCell(s.id,d,fav)+'</td>').join('')+'</tr>'}
 $('table').innerHTML='<table><thead><tr>'+gridHeaders(false)+'</tr></thead><tbody>'+list.map(s=>row(s,false)).join('')+'</tbody></table>';$('favoriteTable').innerHTML='<table><thead><tr>'+gridHeaders(true)+'</tr></thead><tbody>'+gridRows(shops,true).map(s=>row(s,true)).join('')+'</tbody></table>';tableViewports.forEach(updateFrozenColumns);updateAnalytics();selection();}
 function writeAllowed(){return authenticated&&canWrite&&watchLoaded&&remotePhase!=='loading'&&remotePhase!=='saving'}
 function mutationError(error){return error?.message||'저장할 수 없습니다. 다른 변경이 있으면 새로고침 후 다시 시도하세요.'}
-async function mutate(request){if(!writeAllowed()||!remote?.mutate)return false;try{const result=await remote.mutate(request);$('writeError').hidden=true;$('writeError').textContent='';if(result?.data)applyData(result.data);return true}catch(error){const message=mutationError(error);$('error').textContent=message;$('writeError').textContent=message;$('writeError').hidden=false;return false}}
+async function mutate(request){if(!writeAllowed()||!remote?.mutate)return false;const epoch=sessionEpoch;try{await remote.mutate(request);if(epoch!==sessionEpoch)return false;$('writeError').hidden=true;$('writeError').textContent='';return true}catch(error){if(epoch!==sessionEpoch)return false;const message=mutationError(error);$('error').textContent=message;$('writeError').textContent=message;$('writeError').hidden=false;return false}}
 function edit(id){const shop=shops.find(s=>s.id===id);if(!shop)return;editing=id;editBase=JSON.parse(JSON.stringify(shop));$('formTitle').textContent='샵 편집';for(const key of ['name','url','country','visibility','memo'])$('form').elements.namedItem(key).value=shop[key]||'';$('error').textContent='';$('form').hidden=false;$('form').elements.namedItem('name').focus()}
 function closeEdit(){editing=null;editBase=null;$('error').textContent='';$('form').hidden=true;if(watchLoaded)render()}
 function promptDelete(ids){const names=ids.map(id=>shops.find(s=>s.id===id)?.name).filter(Boolean);if(!names.length)return;pendingDeleteIds=ids;$('deleteNames').textContent=names.join(', ');$('deleteDescription').textContent='삭제한 샵은 판매·관측 이력을 보존한 채 추적만 중단됩니다. 나중에 되돌릴 수 있습니다.';$('deleteDialog').showModal()}
@@ -609,8 +645,17 @@ document.querySelectorAll('[data-pin]').forEach(button=>button.onclick=()=>{cons
 const all=$('all');if(all)all.onchange=event=>{filtered().forEach(shop=>event.target.checked?checked.add(shop.id):checked.delete(shop.id));render()};
 document.querySelectorAll('[data-check]').forEach(input=>input.onchange=()=>{input.checked?checked.add(input.dataset.check):checked.delete(input.dataset.check);selection()});
 document.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>{if(writeAllowed())edit(button.dataset.edit)});document.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>{if(writeAllowed())promptDelete([button.dataset.delete])});
-document.querySelectorAll('[data-memo]').forEach(input=>input.onchange=async()=>{const shop=shops.find(s=>s.id===input.dataset.memo);if(!shop)return;const expected=shop.memo??'';if(input.value===expected)return;const ok=await mutate({action:'patch',id:shop.id,values:{memo:input.value},expected:{memo:expected}});if(!ok)input.focus()});
-document.querySelectorAll('[data-custom]').forEach(input=>input.onchange=async()=>{const shop=shops.find(s=>s.id===input.dataset.customShop),field=input.dataset.custom;if(!shop||!field)return;const expected=shop.custom?.[field]??'';if(input.value===expected)return;const ok=await mutate({action:'patch',id:shop.id,values:{[field]:input.value},expected:{[field]:expected}});if(!ok)input.focus()});
+const byId=new Map(shops.map(s=>[s.id,s]));
+for(const el of $('table').querySelectorAll(AUTO_FIELDS)) {
+  const [id,field]=fieldOf(el), draft=autosave.get(id,field);
+  const base=fieldValue(byId.get(id),field);
+  el.setAttribute('aria-keyshortcuts','Alt+ArrowDown');
+  baselines.set(el,draft?.expected??base);el.value=draft?.value??base;
+  const capture=(composing=false)=>{if(hasWritePermission)autosave.input(id,field,el.value,baselines.get(el),composing)};
+  el.oninput=e=>capture(e.isComposing);el.oncompositionend=()=>capture();
+  el.onblur=()=>autosave.flush(id,field);
+}
+document.querySelectorAll('[data-custom]:not([data-custom="custom:카테고리"])').forEach(input=>input.onchange=async()=>{const shop=shops.find(s=>s.id===input.dataset.customShop),field=input.dataset.custom;if(!shop||!field)return;const expected=shop.custom?.[field]??'';if(input.value===expected)return;const ok=await mutate({action:'patch',id:shop.id,values:{[field]:input.value},expected:{[field]:expected}});if(!ok)input.focus()});
 $('bulk').onclick=()=>{if(writeAllowed())promptDelete([...checked])};selection();}
 $('cancel').onclick=closeEdit;
 $('form').elements.namedItem('url').onchange=event=>{const clean=cleanShopUrl(event.target.value);if(clean){event.target.value=clean;if(!$('form').elements.namedItem('name').value)$('form').elements.namedItem('name').value=clean.split('/').pop()}};
@@ -642,77 +687,66 @@ $('date').onchange=e=>{selectedDate=e.target.value&&e.target.value<=dashboardDat
     search.focus();
   });
 
+  const previewFields = AUTO_FIELDS + ',[data-preview]';
   const preview = document.createElement('div');
-  preview.className = 'memo-preview';
-  preview.tabIndex = 0;
-  preview.setAttribute('role', 'region');
-  preview.setAttribute('aria-label', '전체 메모');
-  preview.hidden = true;
-  document.body.append(preview);
-  let activeMemo;
-  let hideTimer;
-  const hidePreview = () => {
+  preview.className = 'memo-preview';preview.id = 'fullFieldPreview';preview.tabIndex = -1;
+  preview.setAttribute('role','region');preview.setAttribute('aria-label','전체 내용');
+  preview.hidden = true;document.body.append(preview);
+  let activeMemo, hideTimer;
+  function hidePreview(){
+    clearTimeout(hideTimer);activeMemo?.removeAttribute('aria-details');
+    activeMemo=null;preview.hidden=true;preview.textContent='';
+  }
+  function positionPreview(){
+    if(!activeMemo?.isConnected){hidePreview();return;}
+    const bounds=activeMemo.getBoundingClientRect(),table=activeMemo.closest('.tablewrap').getBoundingClientRect();
+    if(bounds.bottom<=Math.max(0,table.top)||bounds.top>=Math.min(innerHeight,table.bottom)||
+       bounds.right<=table.left||bounds.left>=table.right){hidePreview();return;}
+    const below=innerHeight-bounds.bottom-4,above=bounds.top-4;
+    const down=below>=Math.min(185,innerHeight*.35)||below>=above;
+    preview.style.maxHeight=Math.max(0,Math.min(185,innerHeight*.35,down?below:above))+'px';
+    preview.style.left=Math.max(10,Math.min(bounds.left,innerWidth-preview.offsetWidth-10))+'px';
+    preview.style.top=(down?bounds.bottom:bounds.top-preview.offsetHeight)+'px';
+  }
+  function showPreview(el){
     clearTimeout(hideTimer);
-    preview.hidden = true;
-    preview.textContent = '';
-    activeMemo = null;
-  };
-  const showPreview = memo => {
-    clearTimeout(hideTimer);
-    if (!memo.textContent.trim()) { hidePreview(); return; }
-    activeMemo = memo;
-    preview.textContent = memo.textContent;
-    preview.hidden = false;
-    positionPreview();
-  };
-  const positionPreview = () => {
-    const bounds = activeMemo.getBoundingClientRect();
-    const table = activeMemo.closest('.tablewrap').getBoundingClientRect();
-    if (bounds.bottom <= Math.max(0, table.top) || bounds.top >= Math.min(innerHeight, table.bottom) ||
-        bounds.right <= table.left || bounds.left >= table.right) { hidePreview(); return; }
-    preview.style.left = Math.max(10, Math.min(bounds.left, innerWidth - preview.offsetWidth - 10)) + 'px';
-    preview.style.top = (innerHeight - bounds.bottom >= preview.offsetHeight
-      ? bounds.bottom : Math.max(0, bounds.top - preview.offsetHeight)) + 'px';
-  };
-  const scheduleHide = () => {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(hidePreview, 160);
-  };
-  document.addEventListener('pointerover', event => {
-    const memo = event.target.closest('[data-memo]');
-    if (memo && event.pointerType !== 'touch') showPreview(memo);
+    const text=el.matches('input,textarea')?el.value:el.textContent;
+    if(!text.trim()){hidePreview();return;}
+    if(activeMemo!==el){hidePreview();preview.scrollTop=0;}
+    activeMemo=el;el.setAttribute('aria-details',preview.id);
+    if(preview.textContent!==text)preview.textContent=text;
+    preview.hidden=false;positionPreview();
+  }
+  function scheduleHide(){clearTimeout(hideTimer);hideTimer=setTimeout(hidePreview,160);}
+  document.addEventListener('pointerover',e=>{const el=e.target.closest(previewFields);if(el&&e.pointerType!=='touch')showPreview(el)});
+  document.addEventListener('pointerout',e=>{if(e.target===activeMemo)scheduleHide()});
+  document.addEventListener('focusin',e=>{if(e.target.matches(previewFields))showPreview(e.target);else if(e.target!==preview)hidePreview()});
+  document.addEventListener('focusout',e=>{
+    if((e.target===activeMemo||e.target===preview)&&e.relatedTarget!==preview)scheduleHide();
+    // Defer until the new focus target is known. Don't remove a pressed table action before click.
+    if(e.target.matches(editorFields)||e.target===preview)queueMicrotask(()=>{
+      if(document.activeElement!==preview&&!document.activeElement?.closest('#table button,#table a,#table input'))resumeRender();
+    });
   });
-  document.addEventListener('pointerout', event => {
-    if (event.target === activeMemo) scheduleHide();
-  });
-  document.addEventListener('focusin', event => {
-    if (event.target.matches('[data-memo]')) showPreview(event.target);
-    else if (event.target !== preview && activeMemo) positionPreview();
-  });
-
-  preview.addEventListener('pointerenter', () => clearTimeout(hideTimer));
-  preview.addEventListener('pointerleave', scheduleHide);
-  document.addEventListener('scroll', event => {
-    if (event.target !== preview && activeMemo) positionPreview();
-  }, true);
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') hidePreview();
-    if (event.key === 'Tab' && !event.shiftKey && event.target === activeMemo && !preview.hidden) {
-      event.preventDefault();
-      preview.focus({ preventScroll: true });
-    } else if (event.key === 'Tab' && event.target === preview && activeMemo) {
-      event.preventDefault();
-      const memo = activeMemo;
-      memo.focus({ preventScroll: true });
-      hidePreview();
-    }
+  document.addEventListener('input',e=>{if(e.target.matches(AUTO_FIELDS))showPreview(e.target)});
+  preview.addEventListener('pointerenter',()=>clearTimeout(hideTimer));preview.addEventListener('pointerleave',scheduleHide);
+  document.addEventListener('scroll',e=>{if(e.target!==preview&&activeMemo)positionPreview()},true);
+  window.addEventListener('resize',()=>{if(activeMemo)positionPreview()});
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&activeMemo){if(e.target===preview)activeMemo.focus({preventScroll:true});hidePreview();}
+    if(e.key==='ArrowDown'&&e.altKey&&e.target===activeMemo){e.preventDefault();preview.focus({preventScroll:true});}
   });
 // render() may be called while installing controls. Never build even an empty grid before a read.
 var watchUIReady, watchLoaded;
-function render(){if(!watchUIReady||!watchLoaded)return;hidePreview();renderLocal();bindReadOnly();}
+function render(){
+  if(!watchUIReady||!watchLoaded)return;
+  if(document.activeElement?.matches(editorFields)){renderDeferred=true;return;}
+  renderDeferred=false;hidePreview();renderLocal();bindReadOnly();updateWriteControls();
+}
 render();
 function clearTrend(){const dialog=$('shopTrend');if(dialog.open)dialog.close();for(const id of ['trendTitle','trendTotal','trendContent'])$(id).replaceChildren();$('trendLink').removeAttribute('href');}
 function clearPrivate(){
+  sessionEpoch++;renderDeferred=false;hasWritePermission=false;autosave.reset();
   checked.clear();watchUndoIds=[];pendingDeleteIds=[];editing=null;editBase=null;canWrite=false;authenticated=false;remotePhase='';
   if($('deleteDialog').open)$('deleteDialog').close();$('deleteNames').replaceChildren();$('undoText').replaceChildren();$('undoBar').hidden=true;$('form').hidden=true;$('form').reset();$('error').textContent='';$('writeError').textContent='';$('writeError').hidden=true;
   watchLoaded=false;$('watchProtected').hidden=true;$('watchSignInPanel').hidden=false;
@@ -730,7 +764,8 @@ function applyData(data){
   const oldAnchor=dashboardData.anchorDay;dashboardData=data;shops=data.shops.map(shop=>({...shop,custom:{...(shop.custom||{})}}));gridColumns=data.customColumns||[];checked.forEach(id=>{if(!shops.some(shop=>shop.id===id))checked.delete(id)});
   if(!selectedDate||selectedDate===oldAnchor||selectedDate>data.anchorDay)selectedDate=data.anchorDay;
   $('date').value=selectedDate;$('date').max=data.anchorDay;watchLoaded=true;
-  const preserveEditor=!$('form').hidden||document.activeElement?.matches('[data-memo],[data-custom]');
+  const preserveEditor=autosave.hasUnsaved()||!$('form').hidden||document.activeElement?.matches(editorFields);
+  renderDeferred=!!preserveEditor;
   try{if(!preserveEditor){clearTrend();render();tableViewports.forEach(updateFrozenColumns)}else updateWriteControls();$('watchProtected').hidden=false;$('watchSignInPanel').hidden=true}catch(err){clearPrivate();throw err}
 }
 function watchStatus(text,error,phase){const pill=$('sheetStatus');pill.textContent=text;pill.dataset.phase=phase;pill.classList.toggle('sync-error',!!error);
@@ -740,9 +775,12 @@ if(typeof config.spreadsheetId==='string'&&/^[A-Za-z0-9_-]+$/.test(config.spread
   $('watchSheet').href='https://docs.google.com/spreadsheets/d/'+config.spreadsheetId+'/edit';$('watchSheet').hidden=false;
 }
 const messages={'setup-required':'연결 설정이 필요합니다. config.js의 OAuth 클라이언트 ID와 시트 ID를 확인하세요.',loading:'Google 연결을 준비하거나 시트를 읽는 중입니다.','sign-in-required':'시트 열람 권한이 있는 Google 계정으로 로그인하세요.',connected:'시트 연결됨',expired:'로그인이 만료되었습니다. 다시 로그인하세요.',error:'연결하지 못했습니다. 인터넷 연결과 시트 열람 권한을 확인하세요.'};
-function updateWriteControls(){const enabled=writeAllowed();document.querySelectorAll('#form input,#form select,#form textarea,#cancel,#watchLogout').forEach(control=>control.disabled=remotePhase==='saving');document.querySelectorAll('[data-edit],[data-delete],#saveEdit,#undo,#deleteConfirm').forEach(control=>control.disabled=!enabled);document.querySelectorAll('[data-memo],[data-custom]').forEach(control=>control.disabled=!enabled);selection()}
-function onState({phase,text,error,canLogin,canRefresh,authenticated:nextAuthenticated,canWrite:nextCanWrite}={}){
-  authenticated=!!nextAuthenticated;canWrite=!!nextCanWrite;remotePhase=phase||'';
+function updateWriteControls(){const apiReady=writeAllowed(),pending=autosave.hasUnsaved(),enabled=apiReady&&!pending;document.querySelectorAll('#form input,#form select,#form textarea,#cancel,#watchLogout').forEach(control=>control.disabled=remotePhase==='saving'||pending);document.querySelectorAll('[data-edit],[data-delete],#saveEdit,#undo,#deleteConfirm').forEach(control=>control.disabled=!enabled);document.querySelectorAll(editorFields).forEach(control=>{
+  if(control.matches(AUTO_FIELDS))control.readOnly=!(authenticated&&hasWritePermission&&watchLoaded);
+  else control.disabled=!enabled;
+});$('discardDraft').disabled=!apiReady;selection()}
+function onState({phase,text,error,canLogin,canRefresh,authenticated:nextAuthenticated,canWrite:nextCanWrite,hasWritePermission:nextPermission}={}){
+  authenticated=!!nextAuthenticated;canWrite=!!nextCanWrite;hasWritePermission=!!nextPermission;remotePhase=phase||'';
   const signed=authenticated&&!['expired','sign-in-required','setup-required'].includes(phase);
   if(!signed&&watchLoaded)clearPrivate();
   const label=(phase==='connected'&&(!signed||!watchLoaded))?'시트 읽기 대기 중':text||messages[phase]||messages.error;
@@ -750,13 +788,17 @@ function onState({phase,text,error,canLogin,canRefresh,authenticated:nextAuthent
   $('watchSignIn').hidden=signed;$('watchSignIn').disabled=signed||!canLogin||phase==='loading';
   $('watchRefresh').disabled=!signed||!canRefresh||phase==='loading';$('watchLogout').hidden=!signed;
   if(!watchLoaded)$('watchGateMessage').textContent=(phase==='sign-in-required'?messages[phase]:label);
-  if(watchLoaded)updateWriteControls();
+  if(watchLoaded){updateWriteControls();autosave.wake()}
 }
+window.addEventListener('beforeunload',event=>{
+  const unsavedForm=editing&&editBase&&['name','url','country','visibility','memo'].some(k=>$('form').elements.namedItem(k).value!==String(editBase[k]??''));
+  if(autosave.hasUnsaved()||unsavedForm||remotePhase==='saving'){event.preventDefault();event.returnValue='';}
+});
 function unavailable(){clearPrivate();onState({phase:'error',text:'연결 도구를 불러오지 못했습니다. 인터넷 연결과 GitHub Pages 설정을 확인한 뒤 페이지를 다시 여세요.'})}
 watchUIReady=true;
 try{
   if(!window.MagicBoardRemote?.create||!window.MagicBoardSheets?.buildDashboardData){unavailable()}else{
-    remote=window.MagicBoardRemote.create({config,onData:applyData,onClear:clearPrivate,onState,shouldAutoRefresh:()=>watchLoaded&&$('form').hidden&&!$('deleteDialog').open&&!document.activeElement?.matches('[data-memo],[data-custom],#form input,#form textarea,#form select')});
+    remote=window.MagicBoardRemote.create({config,onData:applyData,onClear:clearPrivate,onState,shouldAutoRefresh:()=>watchLoaded&&!autosave.hasUnsaved()&&$('form').hidden&&!$('deleteDialog').open&&!document.activeElement?.matches('input,textarea,select')});
     const run=method=>{try{Promise.resolve(remote[method]()).catch(unavailable)}catch{unavailable()}};
     $('watchSignIn').onclick=()=>run('login');$('watchLogout').onclick=()=>run('logout');$('watchRefresh').onclick=()=>run('refresh');run('init');
   }
