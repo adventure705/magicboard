@@ -341,8 +341,8 @@ table td small { font-size: 13px; }
 .period-bar input[type="date"]{width:142px;height:34px;min-height:34px;padding:4px 8px;border-radius:8px;font:inherit;font-size:13px;font-weight:500;background:white;color:var(--ink)}
 .period-bar .date-weekday,.period-bar .period-note{font-size:13px;font-weight:500;color:var(--muted)}
 .ranking-panel {margin-top:var(--gap)}
-.rank-list {list-style:decimal;margin:0;padding:0 0 0 24px;text-align:left;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px;row-gap:8px}.rank-list li {padding:4px 2px}.rank-list a {color:var(--ink);text-decoration:none}.rank-list a:hover,.rank-list a:focus-visible {color:var(--purple);text-decoration:underline}.rank-list b {margin-left:8px}
-@media(max-width:720px){.rank-list{grid-template-columns:minmax(0,1fr)}}
+.rank-list {list-style:decimal;margin:0;padding:0 0 0 24px;text-align:left;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(5,auto);grid-auto-flow:column;column-gap:40px;row-gap:8px}.rank-list li {padding:4px 2px}.rank-list a {color:var(--ink);text-decoration:none}.rank-list a:hover,.rank-list a:focus-visible {color:var(--purple);text-decoration:underline}.rank-list b {margin-left:8px}
+@media(max-width:720px){.rank-list{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-auto-flow:row}}
 #timeAnalytics .empty {display:block;align-content:center}.chart-note {margin:6px 0 0;font-size:12px;color:var(--muted)}
 @media(max-width:740px){.period-bar input[type="date"]{height:36px;min-height:36px;font-size:16px}.period-bar .date-weekday,.period-bar .period-note{font-size:16px}}
 
@@ -379,12 +379,12 @@ th .shop-select { vertical-align:middle; margin-right:6px; }
   <div class="row"><h2 id="trendTitle"></h2><form method="dialog"><button type="submit">닫기</button></form></div>
   <p id="trendTotal"></p>
   <div id="trendContent"></div>
-  <a id="trendLink" class="shop-link" target="_blank" rel="noopener" aria-label="Etsy 샵 열기" title="Etsy 샵 열기"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>
+  <a id="trendLink" class="shop-link" target="_blank" rel="noopener" aria-label="Etsy 샵 열기" title="샵 메인 · Most recent"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>
 </dialog><dialog id="deleteDialog" aria-labelledby="deleteTitle" aria-describedby="deleteDescription"><h2 id="deleteTitle">샵 삭제</h2><p id="deleteDescription">삭제한 샵은 관측 이력은 보존한 채 추적만 중단됩니다.</p><p id="deleteNames" class="muted"></p><div class="row"><span></span><div class="actions"><button id="deleteCancel" type="button">취소</button><button id="deleteConfirm" class="primary" type="button">삭제</button></div></div></dialog>
-<script src="./config.js?v=20261123-rank2"></script>
-<script src="./sheets-data.js?v=20261123-rank2"></script>
-<script src="./sheets-write.js?v=20261123-rank2"></script>
-<script src="./remote-data.js?v=20261123-rank2"></script>
+<script src="./config.js?v=20261123-rank3"></script>
+<script src="./sheets-data.js?v=20261123-rank3"></script>
+<script src="./sheets-write.js?v=20261123-rank3"></script>
+<script src="./remote-data.js?v=20261123-rank3"></script>
 <script>(()=>{
 'use strict';
 const emptyData=()=>({anchorDay:'',shops:[],customColumns:[],history:{},intervalHistory:{},dailySources:{}});
@@ -494,7 +494,7 @@ function updateAnalytics() {
   const fav=activePane==='favorites',field=fav?'favorites':'sold',metric=fav?'즐겨찾기 증감':'판매',mode=periodLabels[period];
   $('rank').textContent=short(selectedDate)+' '+metric+' 순위 · '+mode+' · TOP 10';
   const ranked=shops.map(s=>({name:s.name,url:cleanShopUrl(s.url),value:periodValue(dashboardData,s.id,selectedDate,period,field)})).filter(s=>s.value!==null).sort((a,b)=>b.value-a.value).slice(0,10);
-  $('timeRank').innerHTML=ranked.length?'<ol class="rank-list">'+ranked.map(s=>'<li>'+(s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" aria-label="'+esc(s.name)+' Etsy 샵 열기">'+esc(s.name)+'</a>':esc(s.name))+' <b>'+num(s.value)+'</b></li>').join('')+'</ol>':'–';
+  $('timeRank').innerHTML=ranked.length?'<ol class="rank-list">'+ranked.map(s=>'<li>'+(s.url?'<a href="'+esc(latest(s.url))+'" target="_blank" rel="noopener noreferrer" aria-label="'+esc(s.name)+' Etsy 샵 열기" title="샵 메인 · Most recent">'+esc(s.name)+'</a>':esc(s.name))+' <b>'+num(s.value)+'</b></li>').join('')+'</ol>':'–';
 }
 let gridColumns=[];
 const config=window.MAGIC_BOARD_CONFIG||{};
