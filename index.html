@@ -108,7 +108,7 @@ nav button[aria-selected="true"] { box-shadow: inset 3px 0 #a78bfa; }
 .date-control { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 13px; }
 input, select, textarea { background: white; padding: 8px 10px; border-radius: 9px; min-width: 0; max-width: 100%; }
 input[type="date"] { min-height: 44px; color: var(--ink); }
-.tablewrap { max-height: min(58dvh, 560px); overflow: auto; border-top: 1px solid var(--line); }
+.tablewrap { max-height: none; overflow: auto; border-top: 1px solid var(--line); }
 .tablewrap:focus-visible { outline-offset: -3px; }
 table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; white-space: nowrap; }
 th, td { text-align: right; padding: 8px 12px; min-width: 94px; border-bottom: 1px solid var(--line); }
@@ -151,7 +151,6 @@ td small, th small { display: block; color: var(--muted); }
   nav { flex-direction: row; flex-wrap: wrap; gap: 3px; }
   nav button { font-size: 13px; padding-inline: 9px; }
   nav button[aria-selected="true"] { box-shadow: inset 0 -2px #a78bfa; }
-  .tablewrap { max-height: min(64dvh, 530px); }
   .subline button { min-height: 44px; }
   .search-box input, .date-control input, .memocell input, .customcell input { font-size: 16px; }
 }
@@ -391,11 +390,11 @@ th .shop-select { vertical-align:middle; margin-right:6px; }
   <div id="trendContent"></div>
   <a id="trendLink" class="shop-link" target="_blank" rel="noopener" aria-label="Etsy 샵 열기" title="샵 메인 · Most recent"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>
 </dialog><dialog id="deleteDialog" aria-labelledby="deleteTitle" aria-describedby="deleteDescription"><h2 id="deleteTitle">샵 삭제</h2><p id="deleteDescription">삭제한 샵은 관측 이력은 보존한 채 추적만 중단됩니다.</p><p id="deleteNames" class="muted"></p><div class="row"><span></span><div class="actions"><button id="deleteCancel" type="button">취소</button><button id="deleteConfirm" class="primary" type="button">삭제</button></div></div></dialog>
-<script src="./config.js?v=20261125-clean6"></script>
-<script src="./sheets-data.js?v=20261125-clean6"></script>
-<script src="./sheets-write.js?v=20261125-clean6"></script>
-<script src="./remote-data.js?v=20261125-clean6"></script>
-<script src="./autosave.js?v=20261125-clean6"></script>
+<script src="./config.js?v=20261125-rows7"></script>
+<script src="./sheets-data.js?v=20261125-rows7"></script>
+<script src="./sheets-write.js?v=20261125-rows7"></script>
+<script src="./remote-data.js?v=20261125-rows7"></script>
+<script src="./autosave.js?v=20261125-rows7"></script>
 <script>(()=>{
 'use strict';
 const emptyData=()=>({anchorDay:'',shops:[],customColumns:[],history:{},intervalHistory:{},dailySources:{}});
@@ -434,7 +433,7 @@ function selectPane(pane){
   document.querySelectorAll('[data-pane]').forEach(b=>{const selected=b.dataset.pane===pane;b.setAttribute('aria-selected',String(selected));$(b.dataset.pane).hidden=!selected});
   $('pageTitle').textContent=pane==='sales'?'판매 대시보드':pane==='favorites'?'샵 즐겨찾기':'연결·수집';
   $('timeAnalytics').hidden=pane==='settings';
-  if(watchLoaded && pane!=='settings'){updateAnalytics();tableViewports.forEach(updateFrozenColumns)}
+  if(watchLoaded && pane!=='settings'){updateAnalytics();refreshTableLayout()}
 }
 document.querySelectorAll('[data-pane]').forEach(b=>b.onclick=()=>selectPane(b.dataset.pane));
 function latest(url){const clean=cleanShopUrl(url);return clean?clean+'?sort_order=date_desc':''}
@@ -626,6 +625,31 @@ function gridHeaders(fav) {
   }).join('');
 }
 const tableViewports = [$('table'), $('favoriteTable')];
+const SHOP_TABLE_ROW_LIMIT = 100;
+function updateTableRowLimit(viewport) {
+  if (!viewport.clientWidth) return;
+  const table = viewport.querySelector('table');
+  const rows = table?.tBodies[0]?.rows;
+  let height = 'none';
+  if (rows && rows.length > SHOP_TABLE_ROW_LIMIT) {
+    const contentHeight = rows[SHOP_TABLE_ROW_LIMIT - 1].getBoundingClientRect().bottom - table.getBoundingClientRect().top;
+    const frameHeight = Math.max(0, viewport.offsetHeight - viewport.clientHeight);
+    if (!Number.isFinite(contentHeight) || contentHeight <= 0) return;
+    height = Math.ceil(contentHeight + frameHeight) + 'px';
+  }
+  if (viewport.style.maxHeight !== height) viewport.style.maxHeight = height;
+}
+function refreshTableLayout() {
+  freezeObserver.disconnect();
+  tableViewports.forEach(viewport => {
+    updateFrozenColumns(viewport);
+    updateTableRowLimit(viewport);
+    freezeObserver.observe(viewport);
+    const table = viewport.querySelector('table');
+    if (table) freezeObserver.observe(table);
+  });
+}
+
 function updateFrozenColumns(viewport) {
   const headers = viewport.querySelectorAll('thead th');
   if (headers.length < 7 || !viewport.clientWidth) return;
@@ -642,14 +666,15 @@ function updateFrozenColumns(viewport) {
   viewport.dataset.frozen = frozen;
 }
 const freezeObserver = new ResizeObserver(entries => {
-  for (const { target } of entries) updateFrozenColumns(target);
+  const viewports = new Set(entries.map(({target}) => target.closest('.tablewrap')).filter(Boolean));
+  viewports.forEach(viewport => { updateFrozenColumns(viewport); updateTableRowLimit(viewport); });
 });
 tableViewports.forEach(viewport => freezeObserver.observe(viewport));
-document.fonts.ready.then(() => tableViewports.forEach(updateFrozenColumns));
+document.fonts.ready.then(() => refreshTableLayout());
 
 function selection(){const all=$('all'),list=filtered();if(all){all.checked=!!list.length&&list.every(s=>checked.has(s.id));all.indeterminate=list.some(s=>checked.has(s.id))&&!all.checked}const bulk=$('bulk');bulk.disabled=!writeAllowed()||autosave.hasUnsaved()||!checked.size;bulk.textContent=checked.size?'선택 '+checked.size+'샵 삭제':'선택 삭제'}
 function renderLocal(){days.splice(0,days.length,...endingDays(selectedDate,7));const calendar=$('date').value?calendarDay($('date').value):null;$('dateWeekday').textContent=calendar?calendar.name+'요일'+(calendar.holiday?' · 미국 '+calendar.holiday:calendar.style==='weekend'?' · 주말':''):'';syncFilters();const list=gridRows(filtered(),false);$('noShops').hidden=list.length>0;$('navCount').textContent=shops.length;$('shown').textContent=list.length+' / '+shops.length;function row(s,fav){const pinned=pinnedShops.has(s.id),star='<button type="button" class="pin-shop" data-pin="'+esc(s.id)+'" aria-pressed="'+pinned+'" aria-label="'+esc(s.name)+' 상단 고정">'+(pinned?'★':'☆')+'</button>';const name='<button class="shop-name" type="button" data-trend="'+esc(s.id)+'" title="'+esc(s.name)+'">'+esc(s.name)+'</button>';const selectShop=fav?'':'<input class="shop-select" type="checkbox" data-check="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 선택" '+(checked.has(s.id)?'checked':'')+'>';const editIcon='<path d="m14 5 5 5M4 20l4-1 12-12-4-4L4 15z"/>',deleteIcon='<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',iconButton=(action,label,icon)=>'<button class="shop-icon '+action+'" type="button" data-'+action+'="'+esc(s.id)+'" aria-label="'+esc(s.name+' '+label)+'" title="'+label+'"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></button>';const shopLink=!cleanShopUrl(s.url)?'':'<a class="shop-link" href="'+esc(latest(s.url))+'" target="_blank" rel="noopener" aria-label="'+esc(s.name)+' Etsy 샵 열기" title="Etsy 샵 열기"><svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h6v6m0-6-9 9m7-1v6H5V7h6"/></svg></a>';const actions='<div class="shop-tools">'+selectShop+star+(fav?'':iconButton('edit','편집',editIcon)+iconButton('delete','삭제',deleteIcon))+shopLink+'</div>';const total=fav?s.favorites:s.total,totalCell=!fav&&s.visibility==='공개'&&total!=null&&cleanShopUrl(s.url)?'<a href="'+esc(cleanShopUrl(s.url)+'/sold')+'" target="_blank" rel="noopener" title="판매 상품">'+num(total)+'</a>':num(total);return '<tr data-shop-id="'+esc(s.id)+'"><td><div class="shop-entry">'+name+actions+'</div></td>'+customCell(s,categoryColumn,'customcell categorycell',!fav)+'<td class="memocell">'+(fav?'<span class="read-value" data-preview tabindex="0">'+esc(s.memo||'')+'</span>':'<textarea rows="1" data-memo="'+esc(s.id)+'" aria-label="'+esc(s.name)+' 메모">'+esc(s.memo||'')+'</textarea>')+'</td><td>'+esc(countryLabel(s.country))+'</td><td><span class="public-label">'+esc(s.visibility)+'</span></td><td>'+num(s.items)+'</td><td>'+totalCell+'</td>'+gridColumns.filter(column=>column.key!==CATEGORY_KEY).map(column=>customCell(s,column,'customcell',!fav)).join('')+days.map(d=>'<td class="'+[calendarDay(d).style,d===selectedDate?'selected':''].join(' ')+'" title="'+esc(observationHint(dashboardData,s.id,d,period))+'">'+numericCell(s.id,d,fav)+'</td>').join('')+'</tr>'}
-$('table').innerHTML='<table><thead><tr>'+gridHeaders(false)+'</tr></thead><tbody>'+list.map(s=>row(s,false)).join('')+'</tbody></table>';$('favoriteTable').innerHTML='<table><thead><tr>'+gridHeaders(true)+'</tr></thead><tbody>'+gridRows(shops,true).map(s=>row(s,true)).join('')+'</tbody></table>';tableViewports.forEach(updateFrozenColumns);updateAnalytics();selection();}
+$('table').innerHTML='<table><thead><tr>'+gridHeaders(false)+'</tr></thead><tbody>'+list.map(s=>row(s,false)).join('')+'</tbody></table>';$('favoriteTable').innerHTML='<table><thead><tr>'+gridHeaders(true)+'</tr></thead><tbody>'+gridRows(shops,true).map(s=>row(s,true)).join('')+'</tbody></table>';refreshTableLayout();updateAnalytics();selection();}
 function writeAllowed(){return authenticated&&canWrite&&watchLoaded&&remotePhase!=='loading'&&remotePhase!=='saving'}
 function mutationError(error){return error?.message||'저장할 수 없습니다. 다른 변경이 있으면 새로고침 후 다시 시도하세요.'}
 async function mutate(request){if(!writeAllowed()||!remote?.mutate)return false;const epoch=sessionEpoch;try{await remote.mutate(request);if(epoch!==sessionEpoch)return false;$('writeError').hidden=true;$('writeError').textContent='';return true}catch(error){if(epoch!==sessionEpoch)return false;const message=mutationError(error);$('error').textContent=message;$('writeError').textContent=message;$('writeError').hidden=false;return false}}
@@ -772,7 +797,7 @@ function clearPrivate(){
   if($('deleteDialog').open)$('deleteDialog').close();$('addShop').hidden=true;$('addShopForm').reset();$('addShopMessage').textContent='';setAddError('');addBusy=false;addDirty=false;$('deleteNames').replaceChildren();$('undoText').replaceChildren();$('undoBar').hidden=true;$('form').hidden=true;$('form').reset();$('error').textContent='';$('writeError').textContent='';$('writeError').hidden=true;
   watchLoaded=false;$('watchProtected').hidden=true;$('watchSignInPanel').hidden=false;
   hidePreview();clearTrend();dashboardData=emptyData();shops=[];gridColumns=[];days.length=0;selectedDate='';
-  for(const id of ['table','favoriteTable','timeRank','shown','rank','dateWeekday','navCount'])$(id).replaceChildren();
+  for(const id of ['table','favoriteTable','timeRank','shown','rank','dateWeekday','navCount'])$(id).replaceChildren();refreshTableLayout();
   for(const table of tableViewports){table.removeAttribute('data-frozen');table.removeAttribute('style')}
   $('search').value='';$('date').value='';$('date').removeAttribute('max');syncFilters();$('noShops').hidden=true;
   sortActivated.clear();for(const pane of ['sales','favorites'])gridSort[pane]={key:'name',dir:'asc'};
@@ -787,7 +812,7 @@ function applyData(data){
   $('date').value=selectedDate;$('date').max=data.anchorDay;watchLoaded=true;
   const preserveEditor=autosave.hasUnsaved()||!$('form').hidden||document.activeElement?.matches(editorFields);
   renderDeferred=!!preserveEditor;
-  try{if(!preserveEditor){clearTrend();render();tableViewports.forEach(updateFrozenColumns)}else updateWriteControls();$('watchProtected').hidden=false;$('watchSignInPanel').hidden=true}catch(err){clearPrivate();throw err}
+  try{if(!preserveEditor){clearTrend();render();refreshTableLayout()}else updateWriteControls();$('watchProtected').hidden=false;$('watchSignInPanel').hidden=true}catch(err){clearPrivate();throw err}
 }
 function watchStatus(text,error,phase){const pill=$('sheetStatus');pill.textContent=text;pill.dataset.phase=phase;pill.classList.toggle('sync-error',!!error);
   pill.title=watchLoaded?text+' · 시트 읽은 시각: '+(dashboardData.fetchedAt||'확인 불가')+' / 마지막 Etsy 관측: '+(dashboardData.observedAt||dashboardData.collectedAt||'확인 불가'):text;
