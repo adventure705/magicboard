@@ -22,6 +22,8 @@
   function cleanShopUrl(value) {
     let s = text(value).trim().replace(/^http:\/\//i,'https://');
     if (!/^https?:\/\//i.test(s)) s='https://'+s;
+    // Deliberately accept only a public shop root.  Everything after its slug
+    // is discarded, so tracking URLs cannot make the stored canonical URL long.
     const m=/^https:\/\/(?:www\.|m\.)?etsy\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/([a-z0-9_]+)(?:[/?#]|$)/i.exec(s);
     return m ? 'https://www.etsy.com/shop/'+m[1] : '';
   }
@@ -109,10 +111,45 @@
   }
   function write(out,row,col,val) { out.push({range:range(row,col),values:[[rawValue(val)]]}); }
   function makePlan(data) { return Object.freeze({valueInputOption:'RAW',data:Object.freeze(data.map(x=>Object.freeze({range:x.range,values:Object.freeze([Object.freeze(x.values[0])])}))),expectedCells:Object.freeze(data.map(x=>Object.freeze({range:x.range,values:Object.freeze([Object.freeze(x.values[0])])}))),noOp:data.length===0}); }
-  function plan(registryValues, request) {
+  function createText(key,v) {
+    // Create accepts a long public URL only so it can be reduced to its shop root.
+    if (key==='url') {
+      const raw=inputText(v,32768,true), canonical=cleanShopUrl(raw);
+      if (!canonical || canonical.length>2048) fail('유효한 Etsy 샵 URL을 입력하세요.');
+      return canonical;
+    }
+    return valueFor(key,v);
+  }
+  function registeredAt(v) {
+    if (typeof v!=='string' || !/^\d{4}-\d\d-\d\d [0-2]\d:[0-5]\d:[0-5]\d KST$/.test(v)) fail('등록 시각을 확인하세요.');
+    const m=/^(\d{4}-\d\d-\d\d) (\d\d):/.exec(v);
+    if (+m[2]>23 || !day(m[1])) fail('등록 시각을 확인하세요.');
+    return v;
+  }
+  function createPlan(m,request,meta) {
+    const allowed=new Set(['action','shop']);
+    if(Object.keys(request).some(k=>!allowed.has(k)||!safeKey(k)) || !plain(request.shop)) fail('생성 요청을 확인하세요.');
+    const shopAllowed=new Set(['url','name','country','visibility','memo']);
+    if(Object.keys(request.shop).some(k=>!shopAllowed.has(k)||!safeKey(k)) || !own(request.shop,'url')) fail('생성할 샵 정보를 확인하세요.');
+    if(!plain(meta) || Object.keys(meta).length!==2 || Object.keys(meta).some(k=>!safeKey(k)||!['id','registeredAt'].includes(k))) fail('생성 메타데이터를 확인하세요.');
+    let id;
+    try { id=inputText(meta.id,256,true); } catch (_) { fail('생성 메타데이터를 확인하세요.'); }
+    if(!id || !safeKey(id) || m.ids.has(id)) fail('생성 메타데이터를 확인하세요.');
+    const url=createText('url',request.shop.url);
+    for(const [,entry] of m.ids) if(urlKey(entry.cells[2])===urlKey(url)) fail('이미 등록된 URL입니다 (삭제된 샵 포함).');
+    const name=createText('name',own(request.shop,'name') ? request.shop.name : url.split('/').pop());
+    const country=createText('country',request.shop.country)||'확인 필요';
+    const visibility=createText('visibility',request.shop.visibility||'확인 필요');
+    const memo=createText('memo',request.shop.memo);
+    const row=[id,name,url,country,visibility,'확인 필요','활성',registeredAt(meta.registeredAt),'',memo,'확인 필요','확인 필요','','','미수집'];
+    const append=Object.freeze({range:"'샵목록'!A:O",values:Object.freeze([Object.freeze(row)])});
+    return Object.freeze({valueInputOption:'RAW',data:Object.freeze([]),expectedCells:Object.freeze([]),noOp:false,append,createdId:id,canonicalUrl:url});
+  }
+  function plan(registryValues, request, meta) {
     const m=readRegistry(registryValues);
     if(request&&JSON.stringify(request).length>65536)fail('요청 크기를 확인하세요.');
     if (!plain(request) || !safeKey(request.action)) fail('요청 형식을 확인하세요.');
+    if (request.action==='create') return createPlan(m,request,meta);
     if (request.action==='patch') {
       const allowed=new Set(['action','id','values','expected']);
       if(Object.keys(request).some(k=>!allowed.has(k)||!safeKey(k)) || typeof request.id!=='string' || !safeKey(request.id) || !plain(request.values)||!plain(request.expected)) fail('변경 값과 기존 값이 필요합니다.');
@@ -153,8 +190,15 @@
     fail('요청 작업을 확인하세요.');
   }
   function verify(registryValues, result) {
-    readRegistry(registryValues);
+    const m=readRegistry(registryValues);
     if(!plain(result)||!Array.isArray(result.expectedCells)) fail('쓰기 계획을 확인하세요.');
+    if(own(result,'append') || own(result,'createdId') || own(result,'canonicalUrl')) {
+      if(!result.append || !Array.isArray(result.data) || result.data.length || !Array.isArray(result.expectedCells) || result.expectedCells.length || typeof result.createdId!=='string' || !safeKey(result.createdId) || typeof result.canonicalUrl!=='string' || result.canonicalUrl!==cleanShopUrl(result.canonicalUrl) || result.append.range!=="'샵목록'!A:O" || !Array.isArray(result.append.values) || result.append.values.length!==1 || !Array.isArray(result.append.values[0]) || result.append.values[0].length!==15) fail('쓰기 계획을 확인하세요.');
+      const expected=result.append.values[0], entry=m.ids.get(result.createdId);
+      if(!entry || expected[0]!==result.createdId || expected[2]!==result.canonicalUrl || expected[6]!=='활성' || expected[5]!=='확인 필요' || expected[10]!=='확인 필요' || expected[11]!=='확인 필요' || expected[14]!=='미수집' || expected[8]!=='' || expected[12]!=='' || expected[13]!=='' || !expected[1] || !expected[2] || !expected[3] || !VISIBILITY.has(expected[4]) || !registeredAt(expected[7])) fail('쓰기 확인에 실패했습니다: 생성 행');
+      if(entry.cells.slice(0,15).some((v,i)=>!equal(rawValue(v),rawValue(expected[i])))) fail('쓰기 확인에 실패했습니다: 생성 행');
+      return true;
+    }
     for(const cell of result.expectedCells) {
       if(!plain(cell)||typeof cell.range!=='string'||!Array.isArray(cell.values)||cell.values.length!==1||!Array.isArray(cell.values[0])||cell.values[0].length!==1) fail('쓰기 계획을 확인하세요.');
       const match=/^'샵목록'!([A-Z]+)([1-9]\d*)$/.exec(cell.range); if(!match) fail('쓰기 계획을 확인하세요.');

@@ -4,6 +4,27 @@
   const BASE='https://sheets.googleapis.com/v4/spreadsheets/';
   const CACHE_VERSION='1';
   let gisLoad;
+  const VIEW_NAMES=['판매대시보드','즐겨찾기대시보드'];
+  function creationViewPlan(viewRows,id){
+    if(!/^shop-[A-Za-z0-9_-]{1,100}$/.test(id))throw new Error('새 샵 ID를 확인하세요.');
+    const data=[],checks=[];
+    function column(n){let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s}
+    VIEW_NAMES.forEach((name,index)=>{
+      const rows=viewRows[index],header=rows?.[0],idCol=header?.indexOf('샵 ID');
+      if(!Array.isArray(header)||header[0]!=='샵명'||idCol<1||header.lastIndexOf('샵 ID')!==idCol)throw new Error(name+': 샵 ID 열을 확인하세요.');
+      const positions=[];for(let i=1;i<=200;i++)if(String(rows[i]?.[idCol]||'')===id)positions.push(i);
+      if(positions.length>1)throw new Error(name+': 샵 ID가 중복되었습니다.');
+      let at=positions[0];
+      if(at===undefined){for(let i=1;i<=200;i++){if((rows[i]||[]).every(v=>v===null||v===undefined||v==='')){at=i;break}}
+        if(at===undefined)throw new Error(name+': 빈 대시보드 ID 공간이 없습니다(200행).');
+        const row=at+2,ref='$'+column(idCol)+row;
+        const formula='=IF('+ref+'="","",IF(XLOOKUP('+ref+',\'샵목록\'!$A$2:$A,\'샵목록\'!$G$2:$G,"")="활성",XLOOKUP('+ref+',\'샵목록\'!$A$2:$A,\'샵목록\'!$B$2:$B,""),""))';
+        data.push({range:"'"+name+"'!"+column(idCol)+row,values:[[id]]},{range:"'"+name+"'!A"+row,values:[[formula]]});
+      }
+      checks.push({index,rowIndex:at,idCol,id});
+    });return {data,checks};
+  }
+
   function loadGis(){
     if(root.google?.accounts?.oauth2)return Promise.resolve();
     if(gisLoad)return gisLoad;
@@ -96,7 +117,10 @@
       try{
         // Re-read before planning; only allowed registry cells can be written.
         const before=await readFull(requestController.signal);current();
-        const plan=root.MagicBoardWrites.plan(before.source.registry,request);
+        const createMeta=request.action==='create'?{id:'shop-'+root.crypto.randomUUID(),registeredAt:new Date(Date.now()+9*3600000).toISOString().slice(0,19).replace('T',' ')+' KST'}:undefined;
+        const plan=root.MagicBoardWrites.plan(before.source.registry,request,createMeta);
+        const viewRanges=VIEW_NAMES.map(name=>"'"+name+"'!2:202");
+        if(plan.append)creationViewPlan(await batch(viewRanges,requestController.signal),plan.createdId);
         if(request.action==='patch'&&Object.hasOwn(request.values||{},'url')){
           const old=before.data.shops.find(s=>s.id===request.id);
           if(old&&root.MagicBoardSheets.cleanShopUrl(old.url).toLowerCase()!==root.MagicBoardSheets.cleanShopUrl(request.values.url).toLowerCase()){
@@ -104,8 +128,17 @@
             if(before.source.daily.slice(1).some(row=>row[idCol]===request.id&&row[kindCol]==='일별'&&!row[urlCol]))throw new Error('출처가 없는 과거 기록이 있어 이 주소 변경은 기존 편집 페이지에서 처리해 주세요.');
           }
         }
+        if(plan.append){posted=true;await api('/values/'+encodeURIComponent(plan.append.range)+':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',{method:'POST',signal:requestController.signal,body:{majorDimension:'ROWS',values:plan.append.values}});current()}
         if(plan.data.length){posted=true;await api('/values:batchUpdate',{method:'POST',signal:requestController.signal,body:{valueInputOption:'RAW',data:plan.data}});current()}
-        const after=await readFull(requestController.signal);current();root.MagicBoardWrites.verify(after.source.registry,plan);apply(after);busy=false;state('connected','시트 저장·확인 완료');return {data:after.data};
+        const after=await readFull(requestController.signal);current();root.MagicBoardWrites.verify(after.source.registry,plan);
+        if(plan.append){
+          const views=creationViewPlan(await batch(viewRanges,requestController.signal),plan.createdId);current();
+          // Only generated UUID strings and fixed lookup formulas use USER_ENTERED. User strings stay RAW.
+          if(views.data.length)await api('/values:batchUpdate',{method:'POST',signal:requestController.signal,body:{valueInputOption:'USER_ENTERED',data:views.data}});
+          current();const savedViews=await batch(viewRanges,requestController.signal);current();
+          if(views.checks.some(c=>savedViews[c.index]?.[c.rowIndex]?.[c.idCol]!==c.id))throw new Error('샵 등록 후 시트 뷰 연결을 확인하지 못했습니다.');
+        }
+        apply(after);busy=false;state('connected','시트 저장·확인 완료');return {data:after.data,createdId:plan.createdId};
       }catch(error){
         const message=posted?'저장 요청 후 결과를 확정하지 못했습니다. 새로고침으로 현재 값을 확인하세요. '+(error.status===403?'편집 권한으로 다시 로그인해 주세요.':''):(error.name==='AbortError'?'시트 응답이 지연됐습니다. 새로고침 후 다시 시도하세요.':error.message||'시트에 저장하지 못했습니다.');
         if(activeEpoch===epoch){busy=false;if(error.status===401)expired();else state('error',message,true)}
@@ -139,5 +172,5 @@
     }
     return Object.freeze({init,login,logout,refresh:()=>refresh({force:true}),mutate});
   }
-  root.MagicBoardRemote=Object.freeze({create});
+  root.MagicBoardRemote=Object.freeze({create,creationViewPlan});
 })(globalThis);
